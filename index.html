@@ -1,0 +1,141 @@
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <title>2022-02</title>
+    <script src="./wasm_exec.js"></script>
+    <style type="text/css">
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+        }
+
+        #title {
+            display: flex;
+            justify-content: center;
+        }
+
+        h1 {
+            font-size: 64px;
+            font-weight: normal;
+            text-align: center;
+            margin: 0;
+            padding: 10px;
+            line-height: 0.8;
+        }
+
+        #pixelated-canvas {
+            display: block;
+            margin: auto;
+            width: 100%;
+            height: 100%;
+            max-width: 600px;
+            max-height: 600px;
+        }
+
+        #camera-control {
+            text-align: center;
+            padding: 10px 0;
+        }
+
+        #camera-control button {
+            font-weight: normal;
+            font-size: 32px;
+            margin: 0 20px;
+            padding: 5px 15px;
+            border-top: 10px solid black;
+            border-bottom: 10px solid black;
+            position: relative;
+        }
+
+        #camera-control button:hover {
+            background-color: #ddd;
+            cursor: pointer;
+        }
+
+        #camera-control button:before,
+        #camera-control button:after {
+            content: '';
+            top: 0;
+            width: 10px;
+            height: 100%;
+            position: absolute;
+            background: #000;
+        }
+
+        #camera-control button:before {
+            left: -10px
+        }
+
+        #camera-control button:after {
+            right: -10px
+        }
+
+        p {
+            text-align: center;
+            font-size: 32px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="title">
+        <h3>Webカメラで写したものをドット調にして描画します。</h3>
+    </div>
+    <video id="video" width="200" height="200" style="display: none"></video>
+    <canvas id="canvas" width="200" height="200" style="display: none"></canvas>
+    <canvas id="pixelated-canvas" width="200" height="200"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas')
+        const ctx = canvas.getContext('2d')
+        const video = document.getElementById('video')
+
+        async function showStream() {
+            setCamera()
+            video.addEventListener('loadedmetadata', () => {
+                video.play()
+                window.requestAnimationFrame(() => sync(video, ctx))
+            })
+        }
+
+        async function setCamera(backCam) {
+            video.srcObject = await this._getStream(backCam)
+        }
+
+        function _getStream(backCam) {
+            const config = {
+                video: {
+                    audio: false,
+                    width: 200,
+                    height: 200
+                }
+            }
+            if (backCam) {
+                config.video['facingMode'] = { exact: 'environment' }
+            }
+            return navigator.mediaDevices.getUserMedia(config)
+        }
+
+        function sync(video, ctx) {
+            ctx.drawImage(video, 0, 0, 200, 200)
+            window.requestAnimationFrame(() => sync(video, ctx))
+        }
+
+        const go = new global.Go();
+        fetch("./main.wasm").then(response =>
+            response.arrayBuffer()
+        ).then(bytes =>
+            WebAssembly.instantiate(bytes, go.importObject)
+        ).then(obj => {
+            showStream()
+            go.run(obj.instance)
+        });
+    </script>
+</body>
+
+</html>
